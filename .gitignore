@@ -1,0 +1,26 @@
+# build artifacts - heavy stuff
+debug/
+target/
+
+# rustfmt backups - clutter
+**/*.rs.bk
+
+# temp files & junk
+script.sh
+*.swp
+*~
+
+# macos leftovers
+.DS_Store
+*.dSYM
+
+# archives
+*.tar.gz
+
+# ide configs
+.idea/
+.vscode/
+
+scripts/
+
+# keeping .cs_cfg.json in git so we can share aliases!

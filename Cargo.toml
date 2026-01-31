@@ -1,0 +1,19 @@
+[package]
+name = "cawa"
+version = "1.0.0"
+edition = "2024"
+license = "GPL-3.0"
+readme = "README.md"
+description = "Context-Aware Workspace Automation"
+
+[[bin]]
+name = "cs"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "wrap_help"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+colored = "2.1"
+humantime = "2.1"
+anyhow = "1.0"

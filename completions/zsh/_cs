@@ -1,0 +1,54 @@
+#compdef cs
+
+_cs() {
+    local context state state_descr line
+    typeset -A opt_args
+
+    _arguments -C \
+        '1: :->subcmds' \
+        '*:: :->args'
+
+    case $state in
+        subcmds)
+            local -a commands
+            commands=(
+                'add:Add a new alias'
+                'remove:Remove an alias'
+                'list:List all aliases'
+            )
+            
+            # grab aliases from json
+            if [[ -f .cawa_cfg.json ]]; then
+                # quick and dirty json grep - no heavy deps needed
+                local -a aliases
+                aliases=($(grep -o '"[^"]*":' .cawa_cfg.json | tr -d '":' | grep -v 'identifier'))
+                for alias in $aliases; do
+                    commands+=("$alias:Run alias")
+                done
+            fi
+            
+            _describe 'command' commands
+            ;;
+        args)
+            case $words[1] in
+                add)
+                    _arguments \
+                        '(-p --parallel)'{-p,--parallel}'[Run commands in parallel]' \
+                        '1:alias name:' \
+                        '*::command parts:_cmdstring'
+                    ;;
+                remove)
+                    local -a aliases
+                    if [[ -f .cawa_cfg.json ]]; then
+                        aliases=($(grep -o '"[^"]*":' .cawa_cfg.json | tr -d '":' | grep -v 'identifier'))
+                    fi
+                    _describe 'alias' aliases
+                    ;;
+                *)
+                    # alias args are wildcards - just fallback to files
+                    _files
+                    ;;
+            esac
+            ;;
+    esac
+}
