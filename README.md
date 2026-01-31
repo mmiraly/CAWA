@@ -27,20 +27,39 @@ brew tap mmiraly/tap
 brew install cawa
 ```
 
-### Manual / Build from Source
+### Pre-compiled Binary
 
-If you have Rust installed:
+1. Go to the [Releases](https://github.com/mmiraly/cawa/releases) page.
+2. Download the archive for your OS/Architecture (e.g., `cs-v1.0.0-darwin-arm64.tar.gz`).
+3. Extract and move to your path:
+   ```bash
+   tar -xzf cs-*.tar.gz
+   sudo mv cs /usr/local/bin/
+   ```
+   
+### Build from Source
+
+Requirements: [Rust Toolchain](https://rustup.rs/) (cargo).
+
+#### Option A: Install via Cargo (Recommended)
 
 ```bash
+git clone https://github.com/mmiraly/cawa.git
+cd cawa
 cargo install --path .
 ```
 
-Or build manually:
+This installs the binary to `~/.cargo/bin`, which must be in your `$PATH`.
+
+#### Option B: Manual Build
 
 ```bash
+git clone https://github.com/mmiraly/cawa.git
+cd cawa
 cargo build --release
 sudo cp target/release/cs /usr/local/bin/
 ```
+
 
 ## Usage
 
@@ -76,7 +95,7 @@ cs remove ship
 
 ## Configuration
 
-The config lives in `.cawa_cfg.json`. It is meaningful commit this file to git so your team shares the same aliases!
+The config lives in `.cawa_cfg.json`. It is meaningful to commit this file to git so your team shares the same aliases!
 
 ```json
 {
