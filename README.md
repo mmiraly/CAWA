@@ -8,6 +8,9 @@ Context-Aware Workspace Automation
 
 > Define local scripts that only exist where they matter.
 
+![Cawa](https://github.com/user-attachments/assets/aa6aea36-88f7-4769-8b25-20cae19da2b2)
+
+
 ## Features
 
 - 📂 **Workspace-Isolated**: Workflows live in `.cawa_cfg.json` right next to your code.
