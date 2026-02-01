@@ -1,11 +1,10 @@
-#!/bin/bash
 set -e
 
-# compiling bit...
+# compiling bit
 echo "🔨 Building cs..."
 cargo build --quiet
 
-# where's the binary?
+# binary location
 CS="./target/debug/cs"
 CLI_JSON=".cawa_cfg.json"
 
