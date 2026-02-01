@@ -27,7 +27,13 @@ brew tap mmiraly/tap
 brew install cawa
 ```
 
-### Pre-compiled Binary
+### One-line Installer (Linux & macOS)
+ 
+ ```bash
+ curl -fsSL https://raw.githubusercontent.com/mmiraly/cawa/main/scripts/install.sh | bash
+ ```
+ 
+ ### Pre-compiled Binary
 
 1. Go to the [Releases](https://github.com/mmiraly/cawa/releases) page.
 2. Download the archive for your OS/Architecture (e.g., `cs-v1.0.0-darwin-arm64.tar.gz`).

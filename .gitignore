@@ -21,6 +21,7 @@ script.sh
 .idea/
 .vscode/
 
-scripts/
+scripts/*
+!scripts/install.sh
 
 # keeping .cs_cfg.json in git so we can share aliases!
