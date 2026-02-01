@@ -1,4 +1,3 @@
-#!/bin/bash
 set -e
 
 # CAWA - Context-Aware Workspace Automation Installer
