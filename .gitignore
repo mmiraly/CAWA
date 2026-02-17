@@ -2,6 +2,8 @@
 debug/
 target/
 
+docs/
+
 # rustfmt backups - clutter
 **/*.rs.bk
 
