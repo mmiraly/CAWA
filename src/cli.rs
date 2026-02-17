@@ -4,6 +4,9 @@ use clap::{Parser, Subcommand};
 #[command(name = "cs", disable_help_subcommand = true)]
 #[command(about = "Context-Aware Workspace Automation")]
 pub struct Cli {
+    #[arg(long, global = true)]
+    pub notify: bool,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -20,6 +23,8 @@ pub enum Commands {
     Remove {
         alias: String,
     },
+    // Interactive mode
+    Tui,
     List,
     #[command(external_subcommand)]
     External(Vec<String>),

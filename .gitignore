@@ -26,4 +26,4 @@ script.sh
 scripts/*
 !scripts/install.sh
 
-# keeping .cs_cfg.json in git so we can share aliases!
+.cawa_cfg.json

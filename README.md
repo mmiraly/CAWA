@@ -2,7 +2,9 @@
 
 Context-Aware Workspace Automation
 
-`cawa` (Context-Aware Workspace Automation) is a native, privacy-first tool for defining per-project workflows. Stop cluttering your global shell history with project-specific one-liners.
+`cawa` (Context-Aware Workspace Automation) is a native, privacy-first tool for
+defining per-project workflows. Stop cluttering your global shell history with
+project-specific one-liners.
 
 `cs` (Context Switcher) is the command-line interface for `cawa`.
 
@@ -13,12 +15,20 @@ Context-Aware Workspace Automation
 
 ## Features
 
-- 📂 **Workspace-Isolated**: Workflows live in `.cawa_cfg.json` right next to your code.
-- 🛡️ **Context-First**: Commands only execute when you are effectively "in" the project.
-- 🚀 **Native Speed**: Built in Rust. Zero dependencies. Avg execution overhead < 5ms.
+- 📂 **Workspace-Isolated**: Workflows live in `.cawa_cfg.json` right next to
+  your code.
+- 🛡️ **Context-First**: Commands only execute when you are effectively "in" the
+  project.
+- 🚀 **Native Speed**: Built in Rust. Zero dependencies. Avg execution overhead
+  < 5ms.
 - ⚡ **Parallel Runner**: Batch operations side-by-side with `-p`.
-- ⛓️ **Shell Native**: Pipes, chaining (`&&`), and environment variables work as expected.
-- 🎭 **Flexible Identity**: Rename the binary to `do`, `run`, or `task` and it adapts automatically.
+- 🖥️ **Interactive TUI**: Visual alias selector with `cs tui`.
+- 🔔 **Notifications**: Get a desktop ping when long-running tasks finish with
+  `--notify`.
+- ⛓️ **Shell Native**: Pipes, chaining (`&&`), and environment variables work as
+  expected.
+- 🎭 **Flexible Identity**: Rename the binary to `do`, `run`, or `task` and it
+  adapts automatically.
 - ⏱️ **Performance Metrics**: Optional timing for your heavy build scripts.
 
 ## Installation
@@ -31,21 +41,22 @@ brew install cawa
 ```
 
 ### One-line Installer (Linux & macOS)
- 
- ```bash
- curl -fsSL https://raw.githubusercontent.com/mmiraly/cawa/main/scripts/install.sh | bash
- ```
- 
- ### Pre-compiled Binary
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mmiraly/cawa/main/scripts/install.sh | bash
+```
+
+### Pre-compiled Binary
 
 1. Go to the [Releases](https://github.com/mmiraly/cawa/releases) page.
-2. Download the archive for your OS/Architecture (e.g., `cs-v1.0.0-darwin-arm64.tar.gz`).
+2. Download the archive for your OS/Architecture (e.g.,
+   `cs-v1.0.0-darwin-arm64.tar.gz`).
 3. Extract and move to your path:
    ```bash
    tar -xzf cs-*.tar.gz
    sudo mv cs /usr/local/bin/
    ```
-   
+
 ### Build from Source
 
 Requirements: [Rust Toolchain](https://rustup.rs/) (cargo).
@@ -68,7 +79,6 @@ cd cawa
 cargo build --release
 sudo cp target/release/cs /usr/local/bin/
 ```
-
 
 ## Usage
 
@@ -102,9 +112,35 @@ cs list
 cs remove ship
 ```
 
+### 4. Interactive Mode (TUI)
+
+Don't remember your alias names? Launch the interactive selector:
+
+```bash
+cs tui
+```
+
+- **Up/Down**: Navigate
+- **Enter**: Execute
+- **Esc/q**: Exit
+
+### 5. Notifications
+
+Get a desktop notification when a command finishes (success or fail). Great for
+long builds!
+
+```bash
+# Works with any alias
+cs build --notify
+
+# Works with parallel commands too
+cs test --notify
+```
+
 ## Configuration
 
-The config lives in `.cawa_cfg.json`. It is meaningful to commit this file to git so your team shares the same aliases!
+The config lives in `.cawa_cfg.json`. It is meaningful to commit this file to
+git so your team shares the same aliases!
 
 ```json
 {
@@ -138,9 +174,9 @@ cargo build
 
 Copyright (C) 2026
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the **GNU General Public License as published by
-the Free Software Foundation**, either version 3 of the License, or
-(at your option) any later version.
+This program is free software: you can redistribute it and/or modify it under
+the terms of the **GNU General Public License as published by the Free Software
+Foundation**, either version 3 of the License, or (at your option) any later
+version.
 
 See [LICENSE](LICENSE) for details.
