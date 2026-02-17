@@ -12,7 +12,6 @@ project-specific one-liners.
 
 ![Cawa](https://github.com/user-attachments/assets/aa6aea36-88f7-4769-8b25-20cae19da2b2)
 
-
 ## Features
 
 - 📂 **Workspace-Isolated**: Workflows live in `.cawa_cfg.json` right next to
@@ -131,10 +130,10 @@ long builds!
 
 ```bash
 # Works with any alias
-cs build --notify
+cs test --notify
 
 # Works with parallel commands too
-cs test --notify
+cs build --notify
 ```
 
 ## Configuration
