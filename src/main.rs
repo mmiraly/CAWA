@@ -34,6 +34,7 @@ fn main() -> Result<()> {
     let program_name = get_program_name();
     let mut success = true;
     let mut should_notify = args.notify;
+    let dry_run = args.dry_run;
 
     let mut executed_alias = None;
 
@@ -123,11 +124,36 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Some(Commands::Rename { old_alias, new_alias }) => {
+            let mut config = load_config()?;
+            if let Some(entry) = config.aliases.remove(&old_alias) {
+                config.aliases.insert(new_alias.clone(), entry);
+                save_config(&config)?;
+                println!(
+                    "{} {} → {}",
+                    "🐙".truecolor(80, 80, 80),
+                    old_alias.red(),
+                    new_alias.cyan()
+                );
+            } else {
+                eprintln!("Alias '{}' not found.", old_alias);
+            }
+        }
+        Some(Commands::Run { parallel, commands }) => {
+            let config = load_config()?;
+            let entry = if parallel {
+                AliasEntry::Parallel(commands)
+            } else {
+                AliasEntry::Single(commands.join(" "))
+            };
+            // one-off run: no alias name to look up, just execute directly
+            success = run_entry(&entry, &[], config.enable_timing.unwrap_or(false), dry_run)?;
+        }
         Some(Commands::Tui) => {
             let config = load_config()?;
             if let Some(selected_alias) = tui::run_tui(&config)? {
                 executed_alias = Some(selected_alias.clone());
-                success = run_configured_alias(&config, &selected_alias, &[])?;
+                success = run_configured_alias(&config, &selected_alias, &[], dry_run)?;
             }
         }
         Some(Commands::External(args)) => {
@@ -151,7 +177,7 @@ fn main() -> Result<()> {
             executed_alias = Some(alias.clone());
             let config = load_config()?;
 
-            success = run_configured_alias(&config, alias, &extra_args)?;
+            success = run_configured_alias(&config, alias, &extra_args, dry_run)?;
         }
         None => {
             Cli::command().print_help()?;
@@ -179,81 +205,93 @@ fn run_configured_alias(
     config: &crate::config::Config,
     alias: &str,
     extra_args: &[String],
+    dry_run: bool,
 ) -> Result<bool> {
     if let Some(ac) = config.aliases.get(alias) {
-        let start = Instant::now();
-
-        let success = match &ac.entry {
-            AliasEntry::Single(cmd) => {
-                let mut final_cmd = cmd.clone();
-                if !extra_args.is_empty() {
-                    final_cmd.push_str(" ");
-                    final_cmd.push_str(&extra_args.join(" "));
-                }
-                println!(
-                    "{} Executing: {}",
-                    "🐙".truecolor(80, 80, 80),
-                    final_cmd.cyan()
-                );
-                execute_command(&final_cmd)
-            }
-            AliasEntry::Parallel(cmds) => {
-                println!(
-                    "{} Executing (parallel): {:?}",
-                    "🐙".truecolor(80, 80, 80),
-                    cmds
-                );
-
-                let failure_occurred = Arc::new(AtomicBool::new(false));
-                let mut handles = vec![];
-
-                for cmd in cmds {
-                    // append extra args to each sub-command, same as single aliases do
-                    let cmd_str = if !extra_args.is_empty() {
-                        format!("{} {}", cmd, extra_args.join(" "))
-                    } else {
-                        cmd.clone()
-                    };
-                    let fail_flag = failure_occurred.clone();
-                    handles.push(thread::spawn(move || {
-                        if !execute_command(&cmd_str) {
-                            fail_flag.store(true, Ordering::Relaxed);
-                        }
-                    }));
-                }
-
-                for h in handles {
-                    let _ = h.join();
-                }
-
-                !failure_occurred.load(Ordering::Relaxed)
-            }
-        };
-
-        if config.enable_timing.unwrap_or(false) {
-            // round to ms so humantime doesn't print nanoseconds
-            let duration = Duration::from_millis(start.elapsed().as_millis() as u64);
-
-            if success {
-                println!(
-                    "{}⏱️  {}",
-                    "🐙".truecolor(80, 80, 80),
-                    humantime::format_duration(duration)
-                );
-            } else {
-                eprintln!(
-                    "{}⏱️  {} (Failed)",
-                    "🐙".truecolor(80, 80, 80),
-                    humantime::format_duration(duration)
-                );
-                return Ok(false);
-            }
-        } else if !success {
-            return Ok(false);
-        }
-        Ok(true)
+        run_entry(&ac.entry, extra_args, config.enable_timing.unwrap_or(false), dry_run)
     } else {
         eprintln!("Unknown command or alias: {}", alias);
         Ok(false)
     }
+}
+
+fn run_entry(
+    entry: &AliasEntry,
+    extra_args: &[String],
+    enable_timing: bool,
+    dry_run: bool,
+) -> Result<bool> {
+    let start = Instant::now();
+
+    let success = match entry {
+        AliasEntry::Single(cmd) => {
+            let final_cmd = if !extra_args.is_empty() {
+                format!("{} {}", cmd, extra_args.join(" "))
+            } else {
+                cmd.clone()
+            };
+            if dry_run {
+                println!("{} Would run: {}", "🐙".truecolor(80, 80, 80), final_cmd.cyan());
+                true
+            } else {
+                println!("{} Executing: {}", "🐙".truecolor(80, 80, 80), final_cmd.cyan());
+                execute_command(&final_cmd)
+            }
+        }
+        AliasEntry::Parallel(cmds) => {
+            if dry_run {
+                println!("{} Would run (parallel):", "🐙".truecolor(80, 80, 80));
+                for cmd in cmds {
+                    let full = if !extra_args.is_empty() {
+                        format!("{} {}", cmd, extra_args.join(" "))
+                    } else {
+                        cmd.clone()
+                    };
+                    println!("    {} {}", "└".dimmed(), full.cyan());
+                }
+                return Ok(true);
+            }
+
+            println!("{} Executing (parallel): {:?}", "🐙".truecolor(80, 80, 80), cmds);
+
+            let failure_occurred = Arc::new(AtomicBool::new(false));
+            let mut handles = vec![];
+
+            for cmd in cmds {
+                // append extra args to each sub-command, same as single aliases do
+                let cmd_str = if !extra_args.is_empty() {
+                    format!("{} {}", cmd, extra_args.join(" "))
+                } else {
+                    cmd.clone()
+                };
+                let fail_flag = failure_occurred.clone();
+                handles.push(thread::spawn(move || {
+                    if !execute_command(&cmd_str) {
+                        fail_flag.store(true, Ordering::Relaxed);
+                    }
+                }));
+            }
+
+            for h in handles {
+                let _ = h.join();
+            }
+
+            !failure_occurred.load(Ordering::Relaxed)
+        }
+    };
+
+    if enable_timing {
+        // round to ms so humantime doesn't print nanoseconds
+        let duration = Duration::from_millis(start.elapsed().as_millis() as u64);
+        if success {
+            println!("{}⏱️  {}", "🐙".truecolor(80, 80, 80), humantime::format_duration(duration));
+        } else {
+            eprintln!("{}⏱️  {} (Failed)", "🐙".truecolor(80, 80, 80), humantime::format_duration(duration));
+            return Ok(false);
+        }
+    } else if !success {
+        return Ok(false);
+    }
+
+    Ok(true)
 }

@@ -6,6 +6,8 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[arg(long, global = true)]
     pub notify: bool,
+    #[arg(long, global = true)]
+    pub dry_run: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -24,6 +26,16 @@ pub enum Commands {
     },
     Remove {
         alias: String,
+    },
+    Rename {
+        old_alias: String,
+        new_alias: String,
+    },
+    Run {
+        #[arg(short, long)]
+        parallel: bool,
+        #[arg(required = true, num_args = 1..)]
+        commands: Vec<String>,
     },
     // Interactive mode
     Tui,

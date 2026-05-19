@@ -29,6 +29,11 @@ project-specific one-liners.
 - 🎭 **Flexible Identity**: Rename the binary to `do`, `run`, or `task` and it
   adapts automatically.
 - ⏱️ **Performance Metrics**: Optional timing for your heavy build scripts.
+- 🏷️ **Alias Descriptions**: Document what each alias does with `--desc`.
+- 🔍 **Dry Run**: Preview exactly what would execute before committing with
+  `--dry-run`.
+- ▶️ **One-off Runner**: Use `cs run` for quick parallel or timed commands
+  without saving an alias.
 
 ## Installation
 
@@ -87,6 +92,9 @@ sudo cp target/release/cs /usr/local/bin/
 # Define a 'ship' workflow
 cs add ship "cargo fmt && cargo test && git push"
 
+# Add a description so teammates know what it does
+cs add --desc "build and push to production" ship "cargo fmt && cargo test && git push"
+
 # Create a 'wip' checkpoint
 cs add wip "git add . && git commit -m 'wip'"
 
@@ -102,6 +110,13 @@ cs ship
 
 # Pass arguments (passed through to the underlying command)
 cs ship -- --force
+
+# Preview what would run without executing
+cs ship --dry-run
+
+# Run a one-off command without saving an alias (supports --notify, --dry-run, timing)
+cs run "cargo build --release"
+cs run -p "cargo test" "npm run lint"
 ```
 
 ### 3. Management
@@ -109,6 +124,9 @@ cs ship -- --force
 ```bash
 cs list
 cs remove ship
+
+# Rename an alias without re-defining it
+cs rename ship deploy
 ```
 
 ### 4. Interactive Mode (TUI)
@@ -145,7 +163,15 @@ git so your team shares the same aliases!
 {
   "enable_timing": true,
   "aliases": {
-    "release": "./scripts/release.sh"
+    "release": "./scripts/release.sh",
+    "test": {
+      "run": "cargo test --all",
+      "description": "run the full test suite"
+    },
+    "ci": {
+      "parallel": ["cargo test", "cargo clippy", "cargo fmt --check"],
+      "description": "everything the CI pipeline checks"
+    }
   }
 }
 ```
