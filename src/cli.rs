@@ -22,16 +22,25 @@ pub enum Commands {
         desc: Option<String>,
         #[arg(long)]
         timeout: Option<u64>,
+        #[arg(short = 'g', long)]
+        global: bool,
         alias: String,
         #[arg(required = true, num_args = 1..)]
         commands: Vec<String>,
     },
     Remove {
+        #[arg(short = 'g', long)]
+        global: bool,
         alias: String,
     },
     Rename {
         old_alias: String,
         new_alias: String,
+    },
+    Edit {
+        #[arg(short = 'g', long)]
+        global: bool,
+        alias: String,
     },
     Run {
         #[arg(short, long)]

@@ -4,12 +4,17 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const CONFIG_FILE: &str = ".cawa_cfg.json";
 // kept separate from the config so committing the config doesn't leak run timestamps
 const STATE_FILE: &str = ".cawa_state.json";
+
+fn global_config_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home).join(".config").join("cawa").join("config.json")
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(untagged)]
@@ -111,6 +116,41 @@ pub fn load_config() -> Result<Config> {
 pub fn save_config(config: &Config) -> Result<()> {
     let content = serde_json::to_string_pretty(config)?;
     fs::write(CONFIG_FILE, content).context("Failed to write config file")
+}
+
+pub fn load_global_config() -> Result<Config> {
+    let path = global_config_path();
+    if !path.exists() {
+        return Ok(Config::default());
+    }
+    let content = fs::read_to_string(&path)?;
+    serde_json::from_str(&content).context("Failed to parse global config file")
+}
+
+pub fn save_global_config(config: &Config) -> Result<()> {
+    let path = global_config_path();
+    // create ~/.config/cawa/ if it doesn't exist yet
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let content = serde_json::to_string_pretty(config)?;
+    fs::write(&path, content).context("Failed to write global config file")
+}
+
+pub fn load_merged_config() -> Result<Config> {
+    // start with global aliases, then overlay local ones so local always wins
+    let mut merged = load_global_config().unwrap_or_default();
+    let local = load_config()?;
+    for (k, v) in local.aliases {
+        merged.aliases.insert(k, v);
+    }
+    if local.identifier.is_some() {
+        merged.identifier = local.identifier;
+    }
+    if local.enable_timing.is_some() {
+        merged.enable_timing = local.enable_timing;
+    }
+    Ok(merged)
 }
 
 // last-run timestamps live in a separate file so they don't pollute the committed config

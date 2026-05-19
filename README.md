@@ -36,6 +36,10 @@ project-specific one-liners.
   `--dry-run`.
 - ▶️ **One-off Runner**: Use `cs run` for quick parallel or timed commands
   without saving an alias.
+- 🌍 **Global Aliases**: Define cross-project aliases with `-g`, stored in
+  `~/.config/cawa/config.json`.
+- ✏️ **In-place Edit**: `cs edit <alias>` opens the command in `$EDITOR`
+  without remove-and-re-add.
 
 ## Installation
 
@@ -132,6 +136,27 @@ cs remove ship
 
 # Rename an alias without re-defining it
 cs rename ship deploy
+
+# Edit an alias command in your $EDITOR
+cs edit ship
+```
+
+### 6. Global Aliases
+
+Aliases defined with `-g` live in `~/.config/cawa/config.json` and are
+available in every project. Local aliases always override global ones with
+the same name.
+
+```bash
+# Save to the global config instead of the project config
+cs add -g gs "git status"
+cs add -g gp "git push"
+
+# Remove a global alias
+cs remove -g gs
+
+# Global aliases appear in cs list with a [global] tag
+cs list
 ```
 
 ### 4. Interactive Mode (TUI)

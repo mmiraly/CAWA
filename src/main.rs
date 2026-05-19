@@ -15,7 +15,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::cli::{Cli, Commands};
-use crate::config::{AliasConfig, AliasEntry, load_config, load_state, save_config, save_state, unix_now};
+use crate::config::{AliasConfig, AliasEntry, load_config, load_global_config, load_merged_config, load_state, save_config, save_global_config, save_state, unix_now};
 use crate::runner::execute_command;
 
 fn get_program_name() -> String {
@@ -44,10 +44,11 @@ fn main() -> Result<()> {
             parallel,
             desc,
             timeout,
+            global,
             alias,
             commands,
         }) => {
-            let mut config = load_config()?;
+            let mut config = if global { load_global_config()? } else { load_config()? };
 
             let entry = if parallel {
                 AliasEntry::Parallel(commands.clone())
@@ -65,7 +66,7 @@ fn main() -> Result<()> {
             };
 
             config.aliases.insert(alias.clone(), AliasConfig { entry, description: desc, timeout_secs: timeout });
-            save_config(&config)?;
+            if global { save_global_config(&config)?; } else { save_config(&config)?; }
 
             println!(
                 "{} {} now stores {}",
@@ -74,10 +75,10 @@ fn main() -> Result<()> {
                 display_val.cyan()
             );
         }
-        Some(Commands::Remove { alias }) => {
-            let mut config = load_config()?;
+        Some(Commands::Remove { global, alias }) => {
+            let mut config = if global { load_global_config()? } else { load_config()? };
             if config.aliases.remove(&alias).is_some() { // remove returns the old value if it existed
-                save_config(&config)?;
+                if global { save_global_config(&config)?; } else { save_config(&config)?; }
                 println!(
                     "{} {} {} removed.",
                     "🐙".truecolor(80, 80, 80),
@@ -89,33 +90,36 @@ fn main() -> Result<()> {
             }
         }
         Some(Commands::List) => {
-            let config = load_config()?;
-            if config.aliases.is_empty() {
+            let local = load_config()?;
+            let global_cfg = load_global_config().unwrap_or_default();
+            let state = load_state();
+            let now = unix_now();
+
+            // build a sorted list: local aliases + global-only ones tagged with [global]
+            let mut entries: Vec<(String, &AliasConfig, bool)> = Vec::new();
+            for (k, v) in &local.aliases {
+                entries.push((k.clone(), v, false));
+            }
+            for (k, v) in &global_cfg.aliases {
+                if !local.aliases.contains_key(k) {
+                    entries.push((k.clone(), v, true));
+                }
+            }
+
+            if entries.is_empty() {
                 println!("No aliases found.");
             } else {
-                let state = load_state();
-                let now = unix_now();
+                entries.sort_by(|a, b| a.0.cmp(&b.0));
                 println!("{} Aliases", "🐙".truecolor(80, 80, 80));
                 // sort so the output is stable across runs
-                let mut sorted: Vec<_> = config.aliases.into_iter().collect();
-                sorted.sort_by(|a, b| a.0.cmp(&b.0));
-                for (alias, ac) in sorted {
+                for (alias, ac, is_global) in entries {
+                    let tag = if is_global { " [global]".dimmed().to_string() } else { String::new() };
                     match &ac.entry {
                         AliasEntry::Single(s) => {
-                            println!(
-                                "{} {} → {}",
-                                program_name.dimmed(),
-                                alias.bold(),
-                                s.cyan()
-                            );
+                            println!("{} {}{} → {}", program_name.dimmed(), alias.bold(), tag, s.cyan());
                         }
                         AliasEntry::Parallel(cmds) => {
-                            println!(
-                                "{} {} → {}",
-                                program_name.dimmed(),
-                                alias.bold(),
-                                "[parallel]".yellow()
-                            );
+                            println!("{} {}{} → {}", program_name.dimmed(), alias.bold(), tag, "[parallel]".yellow());
                             for cmd in cmds {
                                 println!("    {} {}", "└".dimmed(), cmd.cyan());
                             }
@@ -129,6 +133,50 @@ fn main() -> Result<()> {
                         println!("    {} ran {} ago", "⏱".dimmed(), humantime::format_duration(age));
                     }
                 }
+            }
+        }
+        Some(Commands::Edit { global, alias }) => {
+            let mut config = if global { load_global_config()? } else { load_config()? };
+
+            if let Some(ac) = config.aliases.get(&alias).cloned() {
+                let tmp = std::env::temp_dir().join(format!("cawa_edit_{}.txt", unix_now()));
+                let contents = match &ac.entry {
+                    AliasEntry::Single(cmd) => cmd.clone(),
+                    // parallel entries get one command per line so the user can add/remove/reorder
+                    AliasEntry::Parallel(cmds) => cmds.join("\n"),
+                };
+                std::fs::write(&tmp, &contents)?;
+
+                let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+                let status = std::process::Command::new(&editor).arg(&tmp).status()?;
+                let edited = std::fs::read_to_string(&tmp)?;
+                let _ = std::fs::remove_file(&tmp);
+
+                if !status.success() {
+                    eprintln!("Editor exited with an error, alias unchanged.");
+                } else {
+                    let lines: Vec<String> = edited
+                        .lines()
+                        .filter(|l| !l.trim().is_empty())
+                        .map(|l| l.to_string())
+                        .collect();
+
+                    let new_entry = match lines.len() {
+                        0 => { eprintln!("Editor result was empty, alias unchanged."); return Ok(()); }
+                        1 => AliasEntry::Single(lines[0].clone()),
+                        _ => AliasEntry::Parallel(lines),
+                    };
+
+                    config.aliases.insert(alias.clone(), AliasConfig {
+                        entry: new_entry,
+                        description: ac.description,
+                        timeout_secs: ac.timeout_secs,
+                    });
+                    if global { save_global_config(&config)?; } else { save_config(&config)?; }
+                    println!("{} {} updated.", "🐙".truecolor(80, 80, 80), alias.cyan());
+                }
+            } else {
+                eprintln!("Alias '{}' not found.", alias);
             }
         }
         Some(Commands::Rename { old_alias, new_alias }) => {
@@ -157,7 +205,8 @@ fn main() -> Result<()> {
             success = run_entry(&entry, &[], config.enable_timing.unwrap_or(false), dry_run, timeout)?;
         }
         Some(Commands::Tui) => {
-            let config = load_config()?;
+            // use merged so global aliases appear in the TUI
+            let config = load_merged_config()?;
             if let Some(selected_alias) = tui::run_tui(&config)? {
                 executed_alias = Some(selected_alias.clone());
                 success = run_configured_alias(&config, &selected_alias, &[], dry_run)?;
@@ -182,7 +231,8 @@ fn main() -> Result<()> {
             }
 
             executed_alias = Some(alias.clone());
-            let config = load_config()?;
+            // use merged so global aliases are reachable by name
+            let config = load_merged_config()?;
 
             success = run_configured_alias(&config, alias, &extra_args, dry_run)?;
         }
