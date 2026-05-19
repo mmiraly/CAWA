@@ -9,6 +9,7 @@ use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
 };
 use std::{io, time::Duration};
@@ -45,21 +46,21 @@ pub fn run_tui(config: &Config) -> Result<Option<String>> {
 }
 
 struct App {
-    aliases: Vec<(String, String)>, // (name, display_value)
+    aliases: Vec<(String, String, bool)>, // (name, display_value, is_parallel)
     state: ListState,
 }
 
 impl App {
     fn new(config: &Config) -> App {
-        let mut aliases: Vec<(String, String)> = config
+        let mut aliases: Vec<(String, String, bool)> = config
             .aliases
             .iter()
             .map(|(k, v)| {
-                let display = match v {
-                    AliasEntry::Single(s) => s.clone(),
-                    AliasEntry::Parallel(cmds) => format!("[{}]", cmds.join(", ")),
+                let (display, is_parallel) = match v {
+                    AliasEntry::Single(s) => (s.clone(), false),
+                    AliasEntry::Parallel(cmds) => (cmds.join(", "), true),
                 };
-                (k.clone(), display)
+                (k.clone(), display, is_parallel)
             })
             .collect();
 
@@ -119,7 +120,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<O
                         KeyCode::Enter => {
                             if let Some(i) = app.state.selected() {
                                 if i < app.aliases.len() {
-                                    return Ok(Some(app.aliases[i].0.clone()));
+                                    return Ok(Some(app.aliases[i].0.clone())); // name is always .0
                                 }
                             }
                         }
@@ -137,12 +138,36 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
         .constraints([Constraint::Min(0), Constraint::Length(3)].as_ref())
         .split(f.area());
 
+    // inner width minus the highlight symbol so long commands don't get clipped silently
+    let available_width = (chunks[0].width as usize).saturating_sub(7);
+
     let items: Vec<ListItem> = app
         .aliases
         .iter()
-        .map(|(name, cmd)| {
-            let line = format!("{}  ➜  {}", name, cmd);
-            ListItem::new(line).style(Style::default().fg(Color::White))
+        .map(|(name, cmd, is_parallel)| {
+            let prefix = format!("{}  ➜  ", name);
+            let reserved = prefix.len() + if *is_parallel { 11 } else { 0 };
+            let max_cmd = available_width.saturating_sub(reserved).max(8);
+            let truncated = if cmd.len() > max_cmd {
+                format!("{}…", &cmd[..max_cmd.saturating_sub(1)])
+            } else {
+                cmd.clone()
+            };
+
+            if *is_parallel {
+                let line = Line::from(vec![
+                    Span::raw(prefix),
+                    Span::styled("[parallel] ", Style::default().fg(Color::Yellow)),
+                    Span::styled(truncated, Style::default().fg(Color::Cyan)),
+                ]);
+                ListItem::new(line)
+            } else {
+                let line = Line::from(vec![
+                    Span::raw(prefix),
+                    Span::styled(truncated, Style::default().fg(Color::Cyan)),
+                ]);
+                ListItem::new(line)
+            }
         })
         .collect();
 

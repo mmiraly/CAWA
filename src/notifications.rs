@@ -47,7 +47,7 @@ pub fn send(success: bool, alias: Option<&str>) -> Result<()> {
         let res = std::process::Command::new("osascript")
             .arg("-e")
             .arg(format!(
-                "display dialog \"{}\" with title \"{}\" buttons {{\"OK\"}} default button \"OK\"",
+                "display notification \"{}\" with title \"{}\"",
                 body, summary
             ))
             .output();

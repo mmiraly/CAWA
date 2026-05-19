@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::cli::{Cli, Commands};
 use crate::config::{AliasEntry, load_config, save_config};
@@ -92,17 +92,31 @@ fn main() -> Result<()> {
                 println!("No aliases found.");
             } else {
                 println!("{} Aliases", "🐙".truecolor(80, 80, 80));
-                for (alias, entry) in config.aliases {
-                    let val = match entry {
-                        AliasEntry::Single(s) => s,
-                        AliasEntry::Parallel(v) => format!("[{}]", v.join(", ")),
-                    };
-                    println!(
-                        "{} {} → {}",
-                        program_name.dimmed(),
-                        alias.bold(),
-                        val.cyan()
-                    );
+                // sort so the output is stable across runs
+                let mut sorted: Vec<_> = config.aliases.into_iter().collect();
+                sorted.sort_by(|a, b| a.0.cmp(&b.0));
+                for (alias, entry) in sorted {
+                    match entry {
+                        AliasEntry::Single(s) => {
+                            println!(
+                                "{} {} → {}",
+                                program_name.dimmed(),
+                                alias.bold(),
+                                s.cyan()
+                            );
+                        }
+                        AliasEntry::Parallel(cmds) => {
+                            println!(
+                                "{} {} → {}",
+                                program_name.dimmed(),
+                                alias.bold(),
+                                "[parallel]".yellow()
+                            );
+                            for cmd in &cmds {
+                                println!("    {} {}", "└".dimmed(), cmd.cyan());
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -186,18 +200,17 @@ fn run_configured_alias(
                     "🐙".truecolor(80, 80, 80),
                     cmds
                 );
-                if !extra_args.is_empty() {
-                    println!(
-                        "{} Warning: Arguments ignored for parallel alias.",
-                        "🐙".truecolor(80, 80, 80)
-                    );
-                }
 
                 let failure_occurred = Arc::new(AtomicBool::new(false));
                 let mut handles = vec![];
 
                 for cmd in cmds {
-                    let cmd_str = cmd.clone();
+                    // append extra args to each sub-command, same as single aliases do
+                    let cmd_str = if !extra_args.is_empty() {
+                        format!("{} {}", cmd, extra_args.join(" "))
+                    } else {
+                        cmd.clone()
+                    };
                     let fail_flag = failure_occurred.clone();
                     handles.push(thread::spawn(move || {
                         if !execute_command(&cmd_str) {
@@ -215,16 +228,20 @@ fn run_configured_alias(
         };
 
         if config.enable_timing.unwrap_or(false) {
-            let duration = start.elapsed();
-            let duration_s = duration.as_secs_f64();
+            // round to ms so humantime doesn't print nanoseconds
+            let duration = Duration::from_millis(start.elapsed().as_millis() as u64);
 
             if success {
-                println!("{}⏱️  {:.3} s", "🐙".truecolor(80, 80, 80), duration_s);
+                println!(
+                    "{}⏱️  {}",
+                    "🐙".truecolor(80, 80, 80),
+                    humantime::format_duration(duration)
+                );
             } else {
                 eprintln!(
-                    "{}⏱️  {:.3} s (Failed)",
+                    "{}⏱️  {} (Failed)",
                     "🐙".truecolor(80, 80, 80),
-                    duration_s
+                    humantime::format_duration(duration)
                 );
                 return Ok(false);
             }
