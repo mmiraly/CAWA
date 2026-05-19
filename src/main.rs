@@ -34,7 +34,7 @@ fn main() -> Result<()> {
     let program_name = get_program_name();
     let mut success = true;
     let mut should_notify = args.notify;
-    let dry_run = args.dry_run;
+    let mut dry_run = args.dry_run;
 
     let mut executed_alias = None;
 
@@ -223,11 +223,14 @@ fn main() -> Result<()> {
             let alias = &args[0];
             let raw_extra_args = &args[1..];
 
-            // Filter out --notify from arguments passed to the alias
+            // filter out our own flags before passing args through to the alias
             let mut extra_args = Vec::new();
             for arg in raw_extra_args {
                 if arg == "--notify" {
                     should_notify = true;
+                } else if arg == "--dry-run" {
+                    // clap doesn't apply global flag parsing inside external subcommands
+                    dry_run = true;
                 } else {
                     extra_args.push(arg.clone());
                 }
