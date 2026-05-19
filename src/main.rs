@@ -15,7 +15,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::cli::{Cli, Commands};
-use crate::config::{AliasEntry, load_config, save_config};
+use crate::config::{AliasConfig, AliasEntry, load_config, save_config};
 use crate::runner::execute_command;
 
 fn get_program_name() -> String {
@@ -41,10 +41,10 @@ fn main() -> Result<()> {
         // ... (Add, Remove, List unchanged)
         Some(Commands::Add {
             parallel,
+            desc,
             alias,
             commands,
         }) => {
-            // ... existing logic ...
             let mut config = load_config()?;
 
             let entry = if parallel {
@@ -57,13 +57,13 @@ fn main() -> Result<()> {
                 }
             };
 
-            config.aliases.insert(alias.clone(), entry.clone());
-            save_config(&config)?;
-
-            let display_val = match entry {
-                AliasEntry::Single(s) => s,
+            let display_val = match &entry {
+                AliasEntry::Single(s) => s.clone(),
                 AliasEntry::Parallel(v) => format!("[{}]", v.join(", ")),
             };
+
+            config.aliases.insert(alias.clone(), AliasConfig { entry, description: desc });
+            save_config(&config)?;
 
             println!(
                 "{} {} now stores {}",
@@ -74,7 +74,7 @@ fn main() -> Result<()> {
         }
         Some(Commands::Remove { alias }) => {
             let mut config = load_config()?;
-            if config.aliases.remove(&alias).is_some() {
+            if config.aliases.remove(&alias).is_some() { // remove returns the old value if it existed
                 save_config(&config)?;
                 println!(
                     "{} {} {} removed.",
@@ -95,8 +95,8 @@ fn main() -> Result<()> {
                 // sort so the output is stable across runs
                 let mut sorted: Vec<_> = config.aliases.into_iter().collect();
                 sorted.sort_by(|a, b| a.0.cmp(&b.0));
-                for (alias, entry) in sorted {
-                    match entry {
+                for (alias, ac) in sorted {
+                    match &ac.entry {
                         AliasEntry::Single(s) => {
                             println!(
                                 "{} {} → {}",
@@ -112,10 +112,13 @@ fn main() -> Result<()> {
                                 alias.bold(),
                                 "[parallel]".yellow()
                             );
-                            for cmd in &cmds {
+                            for cmd in cmds {
                                 println!("    {} {}", "└".dimmed(), cmd.cyan());
                             }
                         }
+                    }
+                    if let Some(desc) = &ac.description {
+                        println!("    {} {}", "ℹ".dimmed(), desc.dimmed());
                     }
                 }
             }
@@ -177,10 +180,10 @@ fn run_configured_alias(
     alias: &str,
     extra_args: &[String],
 ) -> Result<bool> {
-    if let Some(entry) = config.aliases.get(alias) {
+    if let Some(ac) = config.aliases.get(alias) {
         let start = Instant::now();
 
-        let success = match entry {
+        let success = match &ac.entry {
             AliasEntry::Single(cmd) => {
                 let mut final_cmd = cmd.clone();
                 if !extra_args.is_empty() {

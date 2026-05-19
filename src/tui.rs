@@ -14,7 +14,7 @@ use ratatui::{
 };
 use std::{io, time::Duration};
 
-use crate::config::{AliasEntry, Config};
+use crate::config::{AliasEntry, AliasConfig, Config};
 
 pub fn run_tui(config: &Config) -> Result<Option<String>> {
     // setup terminal
@@ -46,21 +46,21 @@ pub fn run_tui(config: &Config) -> Result<Option<String>> {
 }
 
 struct App {
-    aliases: Vec<(String, String, bool)>, // (name, display_value, is_parallel)
+    aliases: Vec<(String, String, bool, Option<String>)>, // (name, display_value, is_parallel, description)
     state: ListState,
 }
 
 impl App {
     fn new(config: &Config) -> App {
-        let mut aliases: Vec<(String, String, bool)> = config
+        let mut aliases: Vec<(String, String, bool, Option<String>)> = config
             .aliases
             .iter()
-            .map(|(k, v)| {
-                let (display, is_parallel) = match v {
+            .map(|(k, ac): (&String, &AliasConfig)| {
+                let (display, is_parallel) = match &ac.entry {
                     AliasEntry::Single(s) => (s.clone(), false),
                     AliasEntry::Parallel(cmds) => (cmds.join(", "), true),
                 };
-                (k.clone(), display, is_parallel)
+                (k.clone(), display, is_parallel, ac.description.clone())
             })
             .collect();
 
@@ -144,7 +144,7 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
     let items: Vec<ListItem> = app
         .aliases
         .iter()
-        .map(|(name, cmd, is_parallel)| {
+        .map(|(name, cmd, is_parallel, _desc)| {
             let prefix = format!("{}  ➜  ", name);
             let reserved = prefix.len() + if *is_parallel { 11 } else { 0 };
             let max_cmd = available_width.saturating_sub(reserved).max(8);
@@ -186,9 +186,12 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
 
     f.render_stateful_widget(aliases_list, chunks[0], &mut app.state);
 
+    // show the description of the selected alias if it has one, otherwise fall back to key hints
     let help_text = match app.state.selected() {
-        Some(_) => "↑/↓: Navigate • Enter: Execute • q: Quit",
-        None => "No aliases defined. Use `cs add` to create one.",
+        Some(i) if !app.aliases.is_empty() => {
+            app.aliases[i].3.as_deref().unwrap_or("↑/↓: Navigate • Enter: Execute • q: Quit")
+        }
+        Some(_) | None => "No aliases defined. Use `cs add` to create one.",
     };
 
     let help = Paragraph::new(help_text)

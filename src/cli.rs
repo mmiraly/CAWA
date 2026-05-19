@@ -16,6 +16,8 @@ pub enum Commands {
     Add {
         #[arg(short, long)]
         parallel: bool,
+        #[arg(short = 'd', long)]
+        desc: Option<String>,
         alias: String,
         #[arg(required = true, num_args = 1..)]
         commands: Vec<String>,
