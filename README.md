@@ -21,7 +21,7 @@ project-specific one-liners.
 - 🚀 **Native Speed**: Built in Rust. Zero dependencies. Avg execution overhead
   < 5ms.
 - ⚡ **Parallel Runner**: Batch operations side-by-side with `-p`.
-- 🖥️ **Interactive TUI**: Visual alias selector with `cs tui`.
+- 🖥️ **Interactive TUI**: Visual alias selector with live search — press `/` to filter.
 - 🔔 **Notifications**: Get a desktop ping when long-running tasks finish with
   `--notify`.
 - ⛓️ **Shell Native**: Pipes, chaining (`&&`), and environment variables work as
@@ -137,9 +137,11 @@ Don't remember your alias names? Launch the interactive selector:
 cs tui
 ```
 
-- **Up/Down**: Navigate
+- **Up/Down** or **j/k**: Navigate
 - **Enter**: Execute
-- **Esc/q**: Exit
+- **/**: Start incremental search — type to filter aliases by name
+- **Esc**: Clear search / exit
+- **q**: Exit
 
 ### 5. Notifications
 
