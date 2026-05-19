@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const CONFIG_FILE: &str = ".cawa_cfg.json";
+pub const CONFIG_FILE: &str = ".cawa_cfg.json";
 // kept separate from the config so committing the config doesn't leak run timestamps
 const STATE_FILE: &str = ".cawa_state.json";
 

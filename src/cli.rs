@@ -50,6 +50,7 @@ pub enum Commands {
         #[arg(required = true, num_args = 1..)]
         commands: Vec<String>,
     },
+    Init,
     // Interactive mode
     Tui,
     List,

@@ -40,6 +40,8 @@ project-specific one-liners.
   `~/.config/cawa/config.json`.
 - ✏️ **In-place Edit**: `cs edit <alias>` opens the command in `$EDITOR`
   without remove-and-re-add.
+- 🧙 **Setup Wizard**: `cs init` walks you through creating a config from
+  scratch with interactive prompts.
 
 ## Installation
 
@@ -92,7 +94,18 @@ sudo cp target/release/cs /usr/local/bin/
 
 ## Usage
 
-### 1. Defining Workflows
+### 1. Quick Setup
+
+New to a project? Run the interactive wizard to create your config:
+
+```bash
+cs init
+```
+
+It will ask for a project identifier, whether to enable timing, and optionally
+seed your first alias — then writes `.cawa_cfg.json` ready to commit.
+
+### 2. Defining Workflows
 
 ```bash
 # Define a 'ship' workflow
@@ -111,7 +124,7 @@ cs add wip "git add . && git commit -m 'wip'"
 cs add -p quality "cargo test --lib" "npm run test:e2e"
 ```
 
-### 2. Running Workflows
+### 3. Running Workflows
 
 ```bash
 # Just run it
@@ -128,7 +141,7 @@ cs run "cargo build --release"
 cs run -p "cargo test" "npm run lint"
 ```
 
-### 3. Management
+### 4. Management
 
 ```bash
 cs list
@@ -140,6 +153,20 @@ cs rename ship deploy
 # Edit an alias command in your $EDITOR
 cs edit ship
 ```
+
+### 5. Interactive Mode (TUI)
+
+Don't remember your alias names? Launch the interactive selector:
+
+```bash
+cs tui
+```
+
+- **Up/Down** or **j/k**: Navigate
+- **Enter**: Execute
+- **/**: Start incremental search — type to filter aliases by name
+- **Esc**: Clear search / exit
+- **q**: Exit
 
 ### 6. Global Aliases
 
@@ -159,21 +186,7 @@ cs remove -g gs
 cs list
 ```
 
-### 4. Interactive Mode (TUI)
-
-Don't remember your alias names? Launch the interactive selector:
-
-```bash
-cs tui
-```
-
-- **Up/Down** or **j/k**: Navigate
-- **Enter**: Execute
-- **/**: Start incremental search — type to filter aliases by name
-- **Esc**: Clear search / exit
-- **q**: Exit
-
-### 5. Notifications
+### 7. Notifications
 
 Get a desktop notification when a command finishes (success or fail). Great for
 long builds!

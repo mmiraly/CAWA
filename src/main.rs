@@ -1,9 +1,9 @@
 mod cli;
 mod config;
+mod notifications;
 mod runner;
 mod tui;
-
-mod notifications;
+mod wizard;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
@@ -134,6 +134,9 @@ fn main() -> Result<()> {
                     }
                 }
             }
+        }
+        Some(Commands::Init) => {
+            wizard::run_init()?;
         }
         Some(Commands::Edit { global, alias }) => {
             let mut config = if global { load_global_config()? } else { load_config()? };
