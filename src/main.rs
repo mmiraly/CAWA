@@ -15,7 +15,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::cli::{Cli, Commands};
-use crate::config::{AliasConfig, AliasEntry, load_config, save_config};
+use crate::config::{AliasConfig, AliasEntry, load_config, load_state, save_config, save_state, unix_now};
 use crate::runner::execute_command;
 
 fn get_program_name() -> String {
@@ -43,6 +43,7 @@ fn main() -> Result<()> {
         Some(Commands::Add {
             parallel,
             desc,
+            timeout,
             alias,
             commands,
         }) => {
@@ -63,7 +64,7 @@ fn main() -> Result<()> {
                 AliasEntry::Parallel(v) => format!("[{}]", v.join(", ")),
             };
 
-            config.aliases.insert(alias.clone(), AliasConfig { entry, description: desc });
+            config.aliases.insert(alias.clone(), AliasConfig { entry, description: desc, timeout_secs: timeout });
             save_config(&config)?;
 
             println!(
@@ -92,6 +93,8 @@ fn main() -> Result<()> {
             if config.aliases.is_empty() {
                 println!("No aliases found.");
             } else {
+                let state = load_state();
+                let now = unix_now();
                 println!("{} Aliases", "🐙".truecolor(80, 80, 80));
                 // sort so the output is stable across runs
                 let mut sorted: Vec<_> = config.aliases.into_iter().collect();
@@ -121,6 +124,10 @@ fn main() -> Result<()> {
                     if let Some(desc) = &ac.description {
                         println!("    {} {}", "ℹ".dimmed(), desc.dimmed());
                     }
+                    if let Some(&last) = state.get(&alias) {
+                        let age = std::time::Duration::from_secs(now.saturating_sub(last));
+                        println!("    {} ran {} ago", "⏱".dimmed(), humantime::format_duration(age));
+                    }
                 }
             }
         }
@@ -139,7 +146,7 @@ fn main() -> Result<()> {
                 eprintln!("Alias '{}' not found.", old_alias);
             }
         }
-        Some(Commands::Run { parallel, commands }) => {
+        Some(Commands::Run { parallel, timeout, commands }) => {
             let config = load_config()?;
             let entry = if parallel {
                 AliasEntry::Parallel(commands)
@@ -147,7 +154,7 @@ fn main() -> Result<()> {
                 AliasEntry::Single(commands.join(" "))
             };
             // one-off run: no alias name to look up, just execute directly
-            success = run_entry(&entry, &[], config.enable_timing.unwrap_or(false), dry_run)?;
+            success = run_entry(&entry, &[], config.enable_timing.unwrap_or(false), dry_run, timeout)?;
         }
         Some(Commands::Tui) => {
             let config = load_config()?;
@@ -208,7 +215,14 @@ fn run_configured_alias(
     dry_run: bool,
 ) -> Result<bool> {
     if let Some(ac) = config.aliases.get(alias) {
-        run_entry(&ac.entry, extra_args, config.enable_timing.unwrap_or(false), dry_run)
+        let result = run_entry(&ac.entry, extra_args, config.enable_timing.unwrap_or(false), dry_run, ac.timeout_secs)?;
+        // record the run timestamp so cs list can show when this was last used
+        if result && !dry_run {
+            let mut state = load_state();
+            state.insert(alias.to_string(), unix_now());
+            let _ = save_state(&state);
+        }
+        Ok(result)
     } else {
         eprintln!("Unknown command or alias: {}", alias);
         Ok(false)
@@ -220,6 +234,7 @@ fn run_entry(
     extra_args: &[String],
     enable_timing: bool,
     dry_run: bool,
+    timeout_secs: Option<u64>,
 ) -> Result<bool> {
     let start = Instant::now();
 
@@ -235,7 +250,7 @@ fn run_entry(
                 true
             } else {
                 println!("{} Executing: {}", "🐙".truecolor(80, 80, 80), final_cmd.cyan());
-                execute_command(&final_cmd)
+                execute_command(&final_cmd, timeout_secs)
             }
         }
         AliasEntry::Parallel(cmds) => {
@@ -266,7 +281,7 @@ fn run_entry(
                 };
                 let fail_flag = failure_occurred.clone();
                 handles.push(thread::spawn(move || {
-                    if !execute_command(&cmd_str) {
+                    if !execute_command(&cmd_str, timeout_secs) {
                         fail_flag.store(true, Ordering::Relaxed);
                     }
                 }));

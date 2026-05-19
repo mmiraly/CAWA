@@ -29,6 +29,8 @@ project-specific one-liners.
 - 🎭 **Flexible Identity**: Rename the binary to `do`, `run`, or `task` and it
   adapts automatically.
 - ⏱️ **Performance Metrics**: Optional timing for your heavy build scripts.
+- ⏰ **Timeouts**: Automatically kill runaway commands after N seconds with `--timeout`.
+- 📅 **Last-run Tracking**: `cs list` shows when each alias was last executed.
 - 🏷️ **Alias Descriptions**: Document what each alias does with `--desc`.
 - 🔍 **Dry Run**: Preview exactly what would execute before committing with
   `--dry-run`.
@@ -95,6 +97,9 @@ cs add ship "cargo fmt && cargo test && git push"
 # Add a description so teammates know what it does
 cs add --desc "build and push to production" ship "cargo fmt && cargo test && git push"
 
+# Kill the command if it runs longer than 120 seconds
+cs add --timeout 120 build "cargo build --release"
+
 # Create a 'wip' checkpoint
 cs add wip "git add . && git commit -m 'wip'"
 
@@ -160,6 +165,9 @@ cs build --notify
 
 The config lives in `.cawa_cfg.json`. It is meaningful to commit this file to
 git so your team shares the same aliases!
+
+A separate `.cawa_state.json` file tracks local run timestamps (used by
+`cs list` to show last-run age). Add it to `.gitignore` — it's machine-local.
 
 ```json
 {

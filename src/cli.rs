@@ -20,6 +20,8 @@ pub enum Commands {
         parallel: bool,
         #[arg(short = 'd', long)]
         desc: Option<String>,
+        #[arg(long)]
+        timeout: Option<u64>,
         alias: String,
         #[arg(required = true, num_args = 1..)]
         commands: Vec<String>,
@@ -34,6 +36,8 @@ pub enum Commands {
     Run {
         #[arg(short, long)]
         parallel: bool,
+        #[arg(long)]
+        timeout: Option<u64>,
         #[arg(required = true, num_args = 1..)]
         commands: Vec<String>,
     },

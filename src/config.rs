@@ -5,8 +5,11 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const CONFIG_FILE: &str = ".cawa_cfg.json";
+// kept separate from the config so committing the config doesn't leak run timestamps
+const STATE_FILE: &str = ".cawa_state.json";
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(untagged)]
@@ -21,21 +24,27 @@ pub enum AliasEntry {
 pub struct AliasConfig {
     pub entry: AliasEntry,
     pub description: Option<String>,
+    pub timeout_secs: Option<u64>,
 }
 
 impl Serialize for AliasConfig {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if let Some(desc) = &self.description {
-            // only use the object form when there's actually a description
+        // use the object form only when there are extra fields to store
+        if self.description.is_some() || self.timeout_secs.is_some() {
             let mut map = serializer.serialize_map(None)?;
             match &self.entry {
                 AliasEntry::Single(cmd) => map.serialize_entry("run", cmd)?,
                 AliasEntry::Parallel(cmds) => map.serialize_entry("parallel", cmds)?,
             }
-            map.serialize_entry("description", desc)?;
+            if let Some(desc) = &self.description {
+                map.serialize_entry("description", desc)?;
+            }
+            if let Some(t) = self.timeout_secs {
+                map.serialize_entry("timeout_secs", &t)?;
+            }
             map.end()
         } else {
-            // no description, keep the old bare format so existing configs don't change
+            // no extra fields, keep the old bare format so existing configs don't change
             self.entry.serialize(serializer)
         }
     }
@@ -45,18 +54,20 @@ impl<'de> Deserialize<'de> for AliasConfig {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let val = Value::deserialize(deserializer)?;
         match &val {
-            // old format: bare string or array — wrap with no description
+            // old format: bare string or array — wrap with no extra fields
             Value::String(_) | Value::Array(_) => {
                 let entry: AliasEntry =
                     serde_json::from_value(val).map_err(serde::de::Error::custom)?;
-                Ok(AliasConfig { entry, description: None })
+                Ok(AliasConfig { entry, description: None, timeout_secs: None })
             }
-            // new format: { "run": "...", "description": "..." }
+            // new format: { "run": "...", "description": "...", "timeout_secs": 60 }
             Value::Object(obj) => {
                 let description = obj
                     .get("description")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
+
+                let timeout_secs = obj.get("timeout_secs").and_then(|v| v.as_u64());
 
                 let entry = if let Some(run) = obj.get("run") {
                     let cmd: String =
@@ -72,7 +83,7 @@ impl<'de> Deserialize<'de> for AliasConfig {
                     ));
                 };
 
-                Ok(AliasConfig { entry, description })
+                Ok(AliasConfig { entry, description, timeout_secs })
             }
             _ => Err(serde::de::Error::custom("invalid alias format")),
         }
@@ -100,4 +111,24 @@ pub fn load_config() -> Result<Config> {
 pub fn save_config(config: &Config) -> Result<()> {
     let content = serde_json::to_string_pretty(config)?;
     fs::write(CONFIG_FILE, content).context("Failed to write config file")
+}
+
+// last-run timestamps live in a separate file so they don't pollute the committed config
+pub fn load_state() -> HashMap<String, u64> {
+    fs::read_to_string(STATE_FILE)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_state(state: &HashMap<String, u64>) -> Result<()> {
+    let content = serde_json::to_string_pretty(state)?;
+    fs::write(STATE_FILE, content).context("Failed to write state file")
+}
+
+pub fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
